@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Knee Rehabilitation Digital Twin Demo</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js"
+          integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg"
+          crossorigin="anonymous"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">SMART HEALTHCARE PROTOTYPE</p>
+      <h1>Knee Rehabilitation Digital Twin</h1>
+      <p class="subtitle">Four rehabilitation exercises, two simulated IMUs, one synchronized 2D leg model.</p>
+    </div>
+    <div class="connection"><span class="status-dot"></span> Live simulation</div>
+  </header>
+
+  <main class="dashboard">
+    <section class="metric-card angle-card">
+      <p class="label">Current knee angle</p>
+      <div><span id="angleValue" class="angle-value">0</span><span class="unit">°</span></div>
+      <p id="phaseValue" class="phase">Ready to begin</p>
+    </section>
+
+    <section class="metric-card">
+      <p class="label">Repetitions</p>
+      <div><span id="repValue" class="metric-value">0</span><span id="repTarget" class="metric-target"> / 5</span></div>
+      <div class="progress-track"><div id="repProgress" class="progress-fill"></div></div>
+    </section>
+
+    <section class="metric-card">
+      <p id="targetLabel" class="label">Target flexion</p>
+      <div><span id="targetValue" class="metric-value">90</span><span class="unit small">°</span></div>
+      <div class="progress-track"><div id="angleProgress" class="progress-fill accent"></div></div>
+    </section>
+
+    <section class="panel exercise-panel">
+      <div class="panel-heading exercise-heading">
+        <div>
+          <p class="label">Exercise programme</p>
+          <h2>Select simulated input data</h2>
+        </div>
+        <span id="programmeProgress" class="badge">0 / 4 complete</span>
+      </div>
+      <div class="exercise-grid">
+        <button class="exercise-card active" data-exercise="heelSlide">
+          <span class="exercise-number">01</span>
+          <span class="exercise-copy"><strong>Heel Slide</strong><small>Basic knee ROM</small></span>
+          <span class="exercise-state ready" data-status="heelSlide">Ready</span>
+        </button>
+        <button class="exercise-card" data-exercise="kneeExtension">
+          <span class="exercise-number">02</span>
+          <span class="exercise-copy"><strong>Knee Extension</strong><small>Extension control</small></span>
+          <span class="exercise-state idle" data-status="kneeExtension">Not started</span>
+        </button>
+        <button class="exercise-card" data-exercise="sitToStand">
+          <span class="exercise-number">03</span>
+          <span class="exercise-copy"><strong>Sit-to-Stand</strong><small>Functional movement</small></span>
+          <span class="exercise-state idle" data-status="sitToStand">Not started</span>
+        </button>
+        <button class="exercise-card" data-exercise="squat">
+          <span class="exercise-number">04</span>
+          <span class="exercise-copy"><strong>Squat</strong><small>Weight-bearing movement</small></span>
+          <span class="exercise-state idle" data-status="squat">Not started</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="panel twin-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="label">Virtual model</p>
+          <h2>2D leg twin</h2>
+        </div>
+        <span id="rangeBadge" class="badge">Neutral range</span>
+      </div>
+      <svg class="leg-view" viewBox="0 0 360 430" role="img" aria-label="Animated two-segment leg">
+        <defs>
+          <linearGradient id="limbGradient" gradientUnits="userSpaceOnUse" x1="60" x2="300">
+            <stop offset="0" stop-color="#42d6c4"/>
+            <stop offset="1" stop-color="#65a8ff"/>
+          </linearGradient>
+        </defs>
+        <line x1="90" y1="45" x2="180" y2="225" class="limb thigh"/>
+        <line id="shank" x1="180" y1="225" x2="180" y2="405" class="limb shank"/>
+        <circle cx="90" cy="45" r="15" class="joint"/>
+        <circle cx="180" cy="225" r="18" class="joint knee"/>
+        <circle id="ankle" cx="180" cy="405" r="14" class="joint"/>
+        <text x="50" y="30" class="svg-label">HIP</text>
+        <text x="195" y="220" class="svg-label">KNEE</text>
+        <text id="ankleLabel" x="195" y="410" class="svg-label">ANKLE</text>
+        <path d="M180 285 A60 60 0 0 1 225 265" class="angle-arc"/>
+      </svg>
+      <div class="sensor-row">
+        <div><span>IMU 1 · thigh</span><strong id="thighValue">0.0°</strong></div>
+        <div><span>IMU 2 · shank</span><strong id="shankValue">0.0°</strong></div>
+      </div>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="label">Session data</p>
+          <h2>Knee-angle history</h2>
+        </div>
+        <span class="legend"><i></i> Flexion angle</span>
+      </div>
+      <canvas id="angleChart" width="900" height="390" aria-label="Knee angle time-series chart"></canvas>
+      <div class="thresholds"><span id="startThreshold">Start threshold: 20°</span><span id="movementThreshold">Target threshold: 80°</span></div>
+    </section>
+
+    <section class="panel controls-panel">
+      <div>
+        <p class="label">Presentation controls</p>
+        <h2>Simulation</h2>
+      </div>
+      <div class="button-row">
+        <button id="startButton" class="primary">Start</button>
+        <button id="resetButton">Reset</button>
+      </div>
+      <label for="manualAngle">Manual knee angle <output id="manualOutput">0°</output></label>
+      <input id="manualAngle" type="range" min="0" max="120" value="0">
+      <label for="targetAngle">Target angle <output id="targetOutput">90°</output></label>
+      <input id="targetAngle" type="range" min="45" max="120" value="90">
+      <label class="toggle-row"><input id="autoToggle" type="checkbox" checked><span>Automatic movement</span></label>
+    </section>
+
+    <section class="panel telemetry-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="label">Backend input</p>
+          <h2>Telemetry preview</h2>
+        </div>
+        <span id="sequenceValue" class="badge code-badge">seq 0</span>
+      </div>
+      <pre id="telemetryJson"></pre>
+      <div id="storageStatus"
+           class="storage-status"
+           hx-get="/fragments/storage-status?exercise=heelSlide"
+           hx-trigger="load, every 2s"
+           hx-swap="innerHTML">
+        <p class="storage-offline">Waiting for SQLite backend…</p>
+      </div>
+      <button class="storage-clear"
+              hx-delete="/api/samples"
+              hx-target="#storageStatus"
+              hx-swap="innerHTML"
+              hx-confirm="Clear all stored demonstration samples?">
+        Clear stored data
+      </button>
+    </section>
+  </main>
+
+  <form id="sampleForm"
+        class="hidden-form"
+        hx-post="/api/samples"
+        hx-trigger="submit"
+        hx-target="#storageStatus"
+        hx-swap="innerHTML"
+        hx-sync="this:drop">
+    <input type="hidden" name="timestamp_ms">
+    <input type="hidden" name="sequence">
+    <input type="hidden" name="exercise_key">
+    <input type="hidden" name="exercise_name">
+    <input type="hidden" name="exercise_status">
+    <input type="hidden" name="calibrated">
+    <input type="hidden" name="thigh_angle">
+    <input type="hidden" name="shank_angle">
+    <input type="hidden" name="knee_angle">
+    <input type="hidden" name="repetitions">
+  </form>
+
+  <footer>This engineering demonstration is not a diagnostic or clinical decision-making tool.</footer>
+  <script src="app.js"></script>
+</body>
+</html>

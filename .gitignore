@@ -1,3 +1,6 @@
+# Serena
+.serena/
+
 # Python
 __pycache__/
 *.py[cod]
